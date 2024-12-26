@@ -73,10 +73,10 @@ const SetOptions: FC<Props> = ({ id }) => {
 
   const sourceAccount = operation.source_account;
 
-  const [masterWeightValue, setMasterWeightValue] = useState<number | string>(
-    masterWeight ?? ""
+  const [masterWeightValue, setMasterWeightValue] = useState(
+    masterWeight?.toString() || ""
   );
-
+  const [selectedSetFlagsBitmask, setSelectedSetFlagsBitmask] = useState(0);
   const [selectedClearFlagsBitmask, setSelectedClearFlagsBitmask] = useState(0);
   const [selectedClearFlags] = useState<number[][]>([]);
   // const [selectedSetFlagsLocal, setSelectedSetFlagsLocal] = useState<number[]>(
@@ -91,7 +91,7 @@ const SetOptions: FC<Props> = ({ id }) => {
   const [lowThresholdValue, setLowThresholdValue] = useState(
     lowThreshold != null ? lowThreshold.toString() : ""
   );
-  const [selectedSetFlagsBitmask, setSelectedSetFlagsBitmask] = useState(0);
+
   const [mediumThresholdValue, setMediumThresholdValue] = useState(
     mediumThreshold != null ? mediumThreshold.toString() : ""
   );
@@ -354,42 +354,66 @@ useEffect(() => {
       }
     };
 
-    useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (masterWeight !== null && masterWeight !== undefined) {
+      params.set("masterWeight" + id.toString(), masterWeight?.toString() || "");
+    }else{
+      params.delete("masterWeight" + id.toString());
+    }
+    
+    if (lowThreshold !== null && lowThreshold !== undefined) {
+      params.set(
+        "lowThreshold" + id.toString(),
+        lowThresholdValue?.toString() || ""
+      );
+    }else{
+      params.delete("lowThreshold" + id.toString());
+    }
+   
+    if (mediumThreshold !== null && mediumThreshold !== undefined) {
+      params.set(
+        "mediumThreshold" + id.toString(),
+        mediumThresholdValue?.toString() || ""
+      );
+    }else{
+      params.delete("mediumThreshold" + id.toString());
+    }
+    
+    if (highThreshold !== null && highThreshold !== undefined) {
+      params.set(
+        "highThreshold" + id.toString(),
+        highThresholdValue?.toString() || ""
+      );
+    }else{
+      params.delete("highThreshold" + id.toString());
+    }
+   
+    if (homeDomain !== null && homeDomain !== undefined) {
+    params.set("homeDomain" + id.toString(), homeDomain?.toString() || "");
+    }else{
+      params.delete("homeDomain" + id.toString());
+    }
+   
   
-      if (masterWeight !== null && masterWeight !== undefined) {
-        params.set("masterWeight" + id.toString(), masterWeight?.toString() || "");
-      } else {
-        params.delete("masterWeight" + id.toString());
-      }
-  
-      if (lowThreshold !== null && lowThreshold !== undefined) {
-        params.set("lowThreshold" + id.toString(), lowThresholdValue?.toString() || "");
-      } else {
-        params.delete("lowThreshold" + id.toString());
-      }
-  
-      if (mediumThreshold !== null && mediumThreshold !== undefined) {
-        params.set("mediumThreshold" + id.toString(), mediumThresholdValue?.toString() || "");
-      } else {
-        params.delete("mediumThreshold" + id.toString());
-      }
-  
-      if (highThreshold !== null && highThreshold !== undefined) {
-        params.set("highThreshold" + id.toString(), highThresholdValue?.toString() || "");
-      } else {
-        params.delete("highThreshold" + id.toString());
-      }
-  
-      if (homeDomain) {
-        params.set("homeDomain" + id.toString(), homeDomain || "");
-      } else {
-        params.delete("homeDomain" + id.toString());
-      }
-  
-      window.history.replaceState({}, "", `?${params.toString()}`);
-    }, [masterWeightValue, lowThresholdValue, mediumThresholdValue, highThresholdValue, id]);
-  
+    if (sourceAccount !== null && sourceAccount !== undefined && sourceAccount !== "") {
+      params.set("sourceAccount" + id.toString(), sourceAccount?.toString() || "");
+    } else {
+      params.delete("sourceAccount" + id.toString());
+    }
+
+    window.history.replaceState({}, "", `?${params.toString()}`);
+  }, [
+    masterWeight,
+    lowThresholdValue,
+    mediumThresholdValue,
+    highThresholdValue,
+    homeDomain,
+    sourceAccount,
+    id,
+   
+  ]);
 
   const handleSignerTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedType = e.target.value;
@@ -442,18 +466,20 @@ useEffect(() => {
 
 
 
+
 useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search);
 
-  // Check that the value is a number before adding it to the parameters
-  if (typeof masterWeight === 'number') {
-      params.set("masterWeight", masterWeight.toString());
-  } else {
-      params.delete("masterWeight"); // Remove the parameter if it is invalid
-  }
+    // Проверяем, что значение является числом, прежде чем добавлять его в параметры
+    if (typeof masterWeight === 'number' && !isNaN(masterWeight)) {
+      params.set("masterWeight", masterWeight?.toString() ?? "");
+    } else {
+      params.delete("masterWeight"); // Удаляем параметр, если он невалиден
+    }
 
-  window.history.replaceState({}, "", `?${params.toString()}`);
-}, [masterWeight]);
+    window.history.replaceState({}, "", `?${params.toString()}`);
+
+  }, [masterWeight]);
 
 
   return (
@@ -480,7 +506,7 @@ useEffect(() => {
         <InputField
           title="Master Weight"
           placeholder="0-255"
-          value={String(masterWeightValue)}
+          value={masterWeightValue}
           onChange={handleInputChange("master_weight")}
           validate={validateRange}
           errorMessage="Expected an integer between 0 and 255 (inclusive)."
@@ -528,7 +554,9 @@ useEffect(() => {
           }
         />
   
-       
+        <div className={s.section}>
+          {/* You might want to add content here if needed */}
+        </div>
   
         <div className={s.section}>
           <h4 className={s.sectionTitle}>

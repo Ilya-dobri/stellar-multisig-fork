@@ -40,7 +40,7 @@ const useXDRDecoding = (trigger: string | null | undefined, envelope: string) =>
   const [operationCount, setOperationCount] = useState<string>("");
   const [signatureCount, setSignatureCount] = useState<string>("");
   const [transaction, setTransaction] = useState<Transaction | null>(null);
-  const [decodingTime, setDecodingTime] = useState<string>(""); // добавлено время
+  const [decodingTime, setDecodingTime] = useState<string>(""); 
 
   const { net } = useStore(useShallow(store => store));
 
@@ -54,7 +54,7 @@ const useXDRDecoding = (trigger: string | null | undefined, envelope: string) =>
         const tx = TransactionBuilder.fromXDR(envelope, net === "testnet" ? Networks.TESTNET : Networks.PUBLIC);
         setTransactionHash(tx.hash().toString("hex"));
         const timestamp = new Date().toISOString();
-        setDecodingTime(timestamp); // сохраняем время
+        setDecodingTime(timestamp); 
 
         if (tx instanceof Transaction) {
           setTransaction(tx);
@@ -91,7 +91,8 @@ const useXDRDecoding = (trigger: string | null | undefined, envelope: string) =>
     operationCount,
     signatureCount,
     transaction,
-    decodingTime, // возвращаем время
+    decodingTime, 
+
   };
 };
 export default useXDRDecoding;
