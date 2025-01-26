@@ -43,7 +43,7 @@ export enum TransactionStatuses {
   canceled = "Canceled",
 }
 
-interface Props {
+export interface Props {
   ID: string;
 }
 

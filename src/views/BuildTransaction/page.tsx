@@ -34,11 +34,7 @@ import { Information } from "@/shared/types";
 
 import { signerOptions } from "@/widgets/OperationTypes/SetOptions/ui";
 
-import {
-  TransactionOverview,
-  TransactionSignatures,
-} from "@/widgets/SignTransaction";
-import { localSignature } from "../SignTransaction/page";
+
 
 
 export interface TXErrors {
@@ -121,7 +117,7 @@ const BuildTransaction: FC = () => {
 
   const decodedXDR = useXDRDecoding(currentXDR, currentXDR);
 
-  const [localSignatures, setLocalSignatures] = useState<localSignature>([""]);
+ 
 
   useEffect(() => {
     const loadJSONWithBigInt = async () => {

@@ -8,7 +8,7 @@ interface InputGroupProps {
   numberOfOperations: string;
   numberOfSignatures: string;
   transactionTime: string; // Время транзакции в формате UTC
-  decodingTime: string;
+  
 }
 
 const InputGroup: FC<InputGroupProps> = ({
@@ -17,10 +17,10 @@ const InputGroup: FC<InputGroupProps> = ({
   numberOfOperations,
   numberOfSignatures,
 
-  decodingTime
+
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const decodingDate = new Date(decodingTime);
+
 
   useEffect(() => {
     // Обновление времени каждую секунду
@@ -28,10 +28,6 @@ const InputGroup: FC<InputGroupProps> = ({
     return () => clearInterval(interval);
   }, []);
   // Форматируем разницу времени
-  const isValidDecodingDate = !isNaN(decodingDate.getTime());
-  const timeDistance = isValidDecodingDate
-    ? formatDistanceStrict(decodingDate, currentTime)
-    : "Invalid decoding time";
 
   return (
     <>

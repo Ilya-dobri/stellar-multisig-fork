@@ -17,15 +17,19 @@ import { getAllTransactions } from "@/shared/api/firebase/firestore/Transactions
 import { hrefToXDR } from "@/shared/helpers";
 import { useShallow } from "zustand/react/shallow";
 import TransactionTable from "@/widgets/SignTransaction/TransactionTable/ui";
-import StellarSdk from "stellar-sdk";
-export type localSignature = string[];
+import { Firestore } from "firebase/firestore";
 
-const SignTransaction: FC = () => {
+export type localSignature = string[];
+export interface Props {
+  ID: string;
+  firestore?: Firestore | null;
+}
+const SignTransaction: FC<Props> = ({ ID }) => {
   const { firestore } = useStore(useShallow((state) => state));
 
   const href = window.location.href;
   const params = useSearchParams();
-  const id: string | undefined | null = params?.get("id");
+
 
   const importXDRParam = params?.get("importXDR") ?? "";
 
@@ -35,7 +39,7 @@ const SignTransaction: FC = () => {
   const net = useStore((state) => state.net);
   const networkPassphrase =
     net === "testnet" ? Networks.TESTNET : Networks.PUBLIC;
-  const [isValidId, setIsValidId] = useState<boolean | null>(null);
+
   const [transactionEnvelope, setTransactionEnvelope] = useState<string>("");
   const [resultXdr, setResultXdr] = useState<string>("");
   const [localSignatures, setLocalSignatures] = useState<localSignature>([""]);
@@ -44,9 +48,7 @@ const SignTransaction: FC = () => {
     useState<string>("");
 
   const { validateTransactionEnvelope } = useTransactionValidation();
-  useEffect(() => {
-    setIsValidId(id ? StellarSdk.StrKey.isValidEd25519PublicKey(id) : null);
-  }, [id]);
+
   useEffect(() => {
     if (transactionEnvelope) {
       validateTransactionEnvelope(transactionEnvelope);
@@ -61,7 +63,7 @@ const SignTransaction: FC = () => {
     operationCount,
     signatureCount,
     transaction,
-    decodingTime,
+
   } = useXDRDecoding(importXDRParam, transactionEnvelope);
 
   const currentTransaction = React.useMemo(() => {
@@ -114,7 +116,7 @@ const SignTransaction: FC = () => {
             operationCount={operationCount}
             signatureCount={signatureCount}
             transaction={transaction}
-            decodingTime={decodingTime}
+          
           />
 
           <TransactionSignatures
@@ -129,7 +131,8 @@ const SignTransaction: FC = () => {
             txHash={transactionHash} 
           />
           <TransactionTable
-   
+           ID={ID || ""}
+
             transactionEnvelope={transactionEnvelope}
             transactionHash={transactionHash}
             sourceAccount={sourceAccount}
@@ -138,7 +141,7 @@ const SignTransaction: FC = () => {
             operationCount={operationCount}
             signatureCount={signatureCount}
             transaction={transaction}
-            decodingTime={decodingTime}
+            firestore={firestore!} 
           />
           {resultXdr && (
             <ShowXdr

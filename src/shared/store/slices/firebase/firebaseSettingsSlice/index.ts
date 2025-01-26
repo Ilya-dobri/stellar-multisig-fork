@@ -51,6 +51,7 @@ export const firebaseSettingsSlice: StateCreator<
     }
   };
 
+  
   const setFirestore = (newFirestore: Firestore | undefined) => {
     set({ firestore: newFirestore });
   };

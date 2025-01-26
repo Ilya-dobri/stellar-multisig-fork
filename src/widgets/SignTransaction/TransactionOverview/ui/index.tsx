@@ -2,6 +2,7 @@ import React, { FC, useEffect, useState } from "react";
 import { Header, InputField, InputGroup } from "../../ui/widgets"
 import { Transaction } from "stellar-sdk";
 import InputTable from "../../ui/widgets/InputTable";
+import { Firestore } from "firebase/firestore";
 
 interface TransactionOverviewProps {
   transactionEnvelope: string;
@@ -12,7 +13,8 @@ interface TransactionOverviewProps {
   operationCount: string;
   signatureCount: string;
   transaction: Transaction | null
-  decodingTime: string
+
+
 }
 
 const TransactionOverview: FC<TransactionOverviewProps> = ({
@@ -24,7 +26,7 @@ const TransactionOverview: FC<TransactionOverviewProps> = ({
   operationCount,
   signatureCount,
   transaction,
-  decodingTime
+
 }) => {
   const [currentTime, setCurrentTime] = useState<string>(new Date().toISOString());
   useEffect(() => {
@@ -60,7 +62,7 @@ const TransactionOverview: FC<TransactionOverviewProps> = ({
           numberOfOperations={operationCount}
           numberOfSignatures={signatureCount}
           transactionTime={currentTime}
-          decodingTime={decodingTime} 
+       
         />
 
       </div>

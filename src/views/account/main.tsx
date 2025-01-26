@@ -1,13 +1,15 @@
-"use client";
-
-import AccountInfo from "./AccountInfo";
-import StellarSdk from "stellar-sdk";
-import { MainLayout } from "@/widgets";
+'use client';
 import React, { FC, useEffect, useState } from "react";
+import StellarSdk from "stellar-sdk";
 import { useSearchParams } from "next/navigation";
+import { MainLayout } from "@/widgets";
 import InputTable from "@/widgets/SignTransaction/ui/widgets/InputTable";
+import AccountInfo from "./AccountInfo";
+import SignTransaction from "../SignTransaction/page";
+import Page from "app/public/sign-transaction/page";
 
 const Account: FC = () => {
+  const [loading, setLoading] = useState<boolean>(true);
   const [isValidId, setIsValidId] = useState<boolean | null>(null);
   const params = useSearchParams();
   const id: string | undefined | null = params?.get("id");
@@ -16,7 +18,13 @@ const Account: FC = () => {
     if (id) setIsValidId(StellarSdk.StrKey.isValidEd25519PublicKey(id));
   }, [id]);
 
-  if (!id || isValidId === null) {
+  useEffect(() => {
+    if (isValidId === true) {
+      setLoading(false);
+    }
+  }, [isValidId]);
+
+  if (!id || isValidId === null || loading) {
     return (
       <MainLayout>
         <center>
@@ -28,7 +36,7 @@ const Account: FC = () => {
 
   if (!id || isValidId === false) {
     return (
-      <MainLayout>
+      <MainLayout >
         <div className="container">
           <div
             className="search error container narrow"
@@ -38,12 +46,15 @@ const Account: FC = () => {
             <div>User ID not found or invalid.</div>
           </div>
         </div>
-        <InputTable ID={id} decodingTime="2024-12-22T10:00:00Z" sequenceNumber={""} transactionFee={""} numberOfOperations={""} numberOfSignatures={""} transactionTime={""} />
+        <Page
+
+
+        />
       </MainLayout>
     );
   }
-  
-  return typeof id === "string" && <AccountInfo ID={id}  />;
+
+  return typeof id === "string" && <AccountInfo ID={id} />;
 };
 
 export default Account;
