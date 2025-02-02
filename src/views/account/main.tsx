@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { MainLayout } from "@/widgets";
 
 import AccountInfo from "./AccountInfo";
-import SignTransaction from "../SignTransaction/page";
+
 import Page from "app/public/sign-transaction/page";
 
 const Account: FC = () => {
