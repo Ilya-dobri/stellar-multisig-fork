@@ -1,13 +1,21 @@
-import { formatDistanceStrict } from "date-fns";
 import React, { FC, useEffect, useState } from "react";
 import { useStore } from "@/shared/store";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, Timestamp } from "firebase/firestore";
+
+import {
+  Timestamp,
+  FirestoreDataConverter,
+  getDocs,
+  collection,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from "firebase/firestore";
 import { useShallow } from "zustand/react/shallow";
 import { TransactionIcon } from "@/entities";
 import Link from "next/link";
 import { collapseAccount } from "@/shared/helpers";
-import { Information, Signer } from "@/shared/types";
+import { Information, Signer, TransactionData } from "@/shared/types";
+import { firestore } from "./firebaseClient";
+import { getAllTransactions } from "@/shared/api/firebase";
 
 interface InputGroupProps {
   sequenceNumber?: string;
@@ -17,34 +25,49 @@ interface InputGroupProps {
   ID: string;
 }
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCKlxZDJPFm9Nljen13J-IzJ8FVbnd21YA",
-  authDomain: "mtl-stellar-multisig.firebaseapp.com",
-  projectId: "mtl-stellar-multisig",
-  storageBucket: "mtl-stellar-multisig.firebasestorage.app",
-  messagingSenderId: "438713537751",
-  appId: "1:438713537751:web:fa75665e11733c5f178c92",
-  measurementId: "G-BYBM9KW3GM"
+const informationConverter: FirestoreDataConverter<TransactionData> = {
+  toFirestore(transaction: TransactionData): DocumentData {
+    return {
+      xdr: transaction.xdr,
+      createdAt: transaction.createdAt,
+      updatedAt: transaction.updatedAt,
+    };
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot): TransactionData {
+    const data = snapshot.data();
+    return {
+      id: snapshot.id,
+      xdr: data.xdr,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  },
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const firestore = getFirestore(firebaseApp);
 
 const InputTable: FC<InputGroupProps> = ({ ID }) => {
-  const { tx, net, information, setInformation } = useStore(
-    useShallow((state) => state)
-  );
-  const [transactionCreatedAt, setTransactionCreatedAt] = useState<Date | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);  // Move this inside the component
-   const [error, setError] = useState<string | null>(null); // Move this inside the component
- 
-
-  const { selectedMemoType, setSelectedMemoType } = useStore(
+  const {
+    tx,
+    net,
+    information,
+    setInformation,
+    selectedMemoType,
+    setSelectedMemoType,
+  } = useStore(
     useShallow((state) => ({
+      tx: state.tx,
+      net: state.net,
+      information: state.information,
+      setInformation: state.setInformation,
       selectedMemoType: state.selectedMemoType,
       setSelectedMemoType: state.setSelectedMemoType,
     }))
   );
+
+  const [transactionCreatedAt, setTransactionCreatedAt] = useState<Date[]>([]);
+ // Move this inside the component
+
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
 
   const sortedSigners = React.useMemo(() => {
     if (!information?.signers?.length) return [];
@@ -55,88 +78,90 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
   }, [information?.signers]);
 
   useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates if unmounted
+  
     const loadInformation = async () => {
       try {
         if (!information || Object.keys(information).length === 0) {
           const storedInformation = localStorage.getItem("information");
           if (storedInformation) {
-            setInformation(JSON.parse(storedInformation));
+            const parsedInfo = JSON.parse(storedInformation);
+            if (isMounted) {
+              setInformation(parsedInfo);
+              setTransactionCreatedAt(parsedInfo.createdAt ? [new Date(parsedInfo.createdAt)] : []);
+            }
           } else if (ID) {
             const response = await fetch(`/api/information?id=${ID}`);
             if (!response.ok) throw new Error("Ошибка загрузки данных");
             const data = await response.json();
-            setInformation(data);
+            if (isMounted) {
+              setInformation(data);
+              setTransactionCreatedAt(data.createdAt ? [new Date(data.createdAt)] : []);
+            }
+          }
+        } else {
+          if (isMounted) {
+            setTransactionCreatedAt(information.created_at ? [new Date(information.created_at)] : []);
+          }
+        }
+  
+        // Firebase request to get transaction data
+        const querySnapshot = await getDocs(collection(firestore, "transactions"));
+        if (!isMounted) return;
+  
+        const transactionsData: TransactionData[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            xdr: data.xdr || "",
+            createdAt: data.createdAt ? (data.createdAt as Timestamp).toMillis() : 0,
+            updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toMillis() : 0,
+          };
+        });
+  
+        if (isMounted) {
+          setTransactions(transactionsData);
+  
+          // Collect unique dates
+          const allDates = new Set<number>(
+            transactionsData.filter((transaction) => transaction.createdAt).map((transaction) => transaction.createdAt)
+          );
+  
+          if (isMounted) {
+            setTransactionCreatedAt(Array.from(allDates).map((ts) => new Date(ts)));
           }
         }
       } catch (error) {
         console.error("Ошибка при загрузке информации:", error);
       }
     };
-
+  
     loadInformation();
-  }, [ID, information, setInformation]);
-
-  useEffect(() => {
-    const fetchTransactionData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        if (firestore && ID) {
-          const transactionRef = doc(firestore, "TransactionsForSignPublic", ID);
-          const transactionSnapshot = await getDoc(transactionRef);
-
-          if (transactionSnapshot.exists()) {
-            const transactionData = transactionSnapshot.data();
-
-            console.log("Полученные данные из Firestore:", transactionData);
-
-            setInformation(transactionData as Information);
-
-            if (transactionData.createdAt) {
-              const createdAtTimestamp = transactionData.createdAt;
-              // Убедитесь, что это объект Firestore Timestamp и преобразуйте в Date
-              if (createdAtTimestamp instanceof Timestamp) {
-                const createdAtDate = createdAtTimestamp.toDate();
-                console.log("Дата создания транзакции:", createdAtDate);
-                setTransactionCreatedAt(createdAtDate);
-              } else {
-                console.warn("Неверный формат времени.");
-              }
-            } else {
-              console.warn("Поле createdAt отсутствует в документе.");
-            }
-          } else {
-            throw new Error("Документ не найден в Firestore.");
-          }
-        }
-      } catch (error) {
-        console.error("Ошибка при загрузке данных из Firestore:", error);
-        setError("Не удалось загрузить данные. Попробуйте позже.");
-      } finally {
-        setLoading(false);
-      }
+  
+    return () => {
+      isMounted = false; // Cleanup when the component is unmounted
     };
-
-    fetchTransactionData();
-  }, [firestore, ID, setInformation]);
+  }, [information, setInformation, ID]);
+  
+  
 
   if (!information) {
     return <div>Loading...</div>;
   }
 
+
+  if (!information) {
+    return <div>Нет данных для отображения</div>;
+  }
+  
   return (
     <div className="segment blank">
       <div className="container" style={{ borderRadius: "10px", overflow: "hidden" }}>
         <table className="table">
           <thead className="bg-gray-100">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700" style={{ fontSize: "18px", borderRadius: "5px" }}>
-                Public Key
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700" style={{ fontSize: "18px", borderRadius: "5px", padding: "10px 100px" }}>
-                Weight
-              </th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Public Key</th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Weight</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -147,41 +172,40 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
                     memoText={tx.tx.memo.toString()}
                     selectedMemoType={selectedMemoType}
                     setSelectedMemoType={setSelectedMemoType}
-                    ID={ID}
                     lowerTime={tx.tx.cond.time.max_time}
                     upperTime={tx.tx.cond.time.min_time}
                     baseFee={tx.tx.fee || 100}
                     isVisible={false}
                     typeIcon="Change"
                     typeOp="set_options"
-                    masterWeight={item.key === ID ? item.weight : null}
-                    weight={item.key !== ID ? item.weight : null}
-                    sourceAccount={item.key !== ID ? item.key : null}
+                    masterWeight={item.weight}
+                    weight={item.weight}
+                    sourceAccount={item.key}
+                    ID={""}
                   />
                   <Link href={`/${net}/account?id=${item.key}`} legacyBehavior>
-                    <a title={item.key} aria-label={item.key} className="account-address word-break">
+                    <a title={item.key} className="account-address word-break">
                       <span>{collapseAccount(item.key)}</span>
                     </a>
                   </Link>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span style={{ paddingLeft: "105px" }}>(w: <b>{item.weight}</b>)</span>
+                  <span>(w: <b>{item.weight}</b>)</span>
                 </td>
               </tr>
             ))}
-          <tr>
-    <td colSpan={2} className="px-6 py-4 text-gray-700">
-      <div>
-        <h3>Время создания:</h3>
-        <span>{transactionCreatedAt ? transactionCreatedAt.toLocaleString() : "N/A"}</span>
-        <div>{error}</div>;
-
-      </div>
-    </td>
-  </tr>
-             
           </tbody>
         </table>
+        <div className="px-6 py-4 text-gray-700">
+          <h3>Transaction Creation Time:</h3>
+          <ul>
+            {transactionCreatedAt.length > 0 ? (
+              transactionCreatedAt.map((date, index) => <li key={index}>{date.toLocaleString()}</li>)
+            ) : (
+              <span>N/A</span>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   );

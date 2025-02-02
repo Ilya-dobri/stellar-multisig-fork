@@ -3,7 +3,7 @@ import React, { FC, useEffect, useState } from "react";
 import StellarSdk from "stellar-sdk";
 import { useSearchParams } from "next/navigation";
 import { MainLayout } from "@/widgets";
-import InputTable from "@/widgets/SignTransaction/ui/widgets/InputTable";
+
 import AccountInfo from "./AccountInfo";
 import SignTransaction from "../SignTransaction/page";
 import Page from "app/public/sign-transaction/page";

@@ -1,7 +1,7 @@
 import React, { FC, useEffect, useState } from "react";
 import { Header, InputField, InputGroup } from "../../ui/widgets"
 import { Transaction } from "stellar-sdk";
-import InputTable from "../../ui/widgets/InputTable";
+
 import { Firestore } from "firebase/firestore";
 
 interface TransactionOverviewProps {

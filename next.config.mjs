@@ -31,5 +31,5 @@ const nextConfig = {
     },
     reactStrictMode: false,
 };
-
+console.log("Loaded ENV:", process.env);
 export default nextConfig;

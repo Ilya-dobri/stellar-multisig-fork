@@ -37,7 +37,7 @@ const TransactionTable: React.FC<TransactionOverviewProps> = ({  transactionEnve
     <div className="segment blank" >
 
     <InputTable
-          ID={ID}
+           ID={ID}
           sequenceNumber={sequenceNumber}
           transactionFee={transactionFee}
           numberOfOperations={operationCount}
