@@ -16,6 +16,8 @@ import { collapseAccount } from "@/shared/helpers";
 import { Information, Signer, TransactionData } from "@/shared/types";
 import { firestore } from "./firebaseClient";
 import { getAllTransactions } from "@/shared/api/firebase";
+import Error from "next/error";
+import TableList from "./TableList";
 
 interface InputGroupProps {
   sequenceNumber?: string;
@@ -24,25 +26,6 @@ interface InputGroupProps {
   numberOfSignatures?: string;
   ID: string;
 }
-
-const informationConverter: FirestoreDataConverter<TransactionData> = {
-  toFirestore(transaction: TransactionData): DocumentData {
-    return {
-      xdr: transaction.xdr,
-      createdAt: transaction.createdAt,
-      updatedAt: transaction.updatedAt,
-    };
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot): TransactionData {
-    const data = snapshot.data();
-    return {
-      id: snapshot.id,
-      xdr: data.xdr,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-    };
-  },
-};
 
 
 const InputTable: FC<InputGroupProps> = ({ ID }) => {
@@ -63,11 +46,31 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
       setSelectedMemoType: state.setSelectedMemoType,
     }))
   );
+  const informationConverter: FirestoreDataConverter<TransactionData> = {
+    toFirestore(transaction: TransactionData): DocumentData {
+      return {
+        xdr: transaction.xdr,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt,
+      };
+    },
+    fromFirestore(snapshot: QueryDocumentSnapshot): TransactionData {
+      const data = snapshot.data();
+      return {
+        id: snapshot.id,
+        xdr: data.xdr,
+        createdAt: data.createdAt?.toDate() || new Date(),
+    updatedAt: data.updatedAt?.toDate() || new Date(),
+      };
+    },
+  };
+  const [isFirestoreActive, setIsFirestoreActive] = useState(true);
+  
+  const [transactionsBySigner, setTransactionsBySigner] = useState<Record<string, Date>>({});
 
-  const [transactionCreatedAt, setTransactionCreatedAt] = useState<Date[]>([]);
  // Move this inside the component
 
-  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+ 
 
   const sortedSigners = React.useMemo(() => {
     if (!information?.signers?.length) return [];
@@ -78,70 +81,73 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
   }, [information?.signers]);
 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates if unmounted
+    let isMounted = true;
+    console.log("⚡ useEffect запустился");
   
     const loadInformation = async () => {
       try {
+        let localDates: Record<string, Date> = {};
+  
         if (!information || Object.keys(information).length === 0) {
           const storedInformation = localStorage.getItem("information");
+          console.log("🗄️ Данные из localStorage:", storedInformation);
+  
           if (storedInformation) {
             const parsedInfo = JSON.parse(storedInformation);
             if (isMounted) {
               setInformation(parsedInfo);
-              setTransactionCreatedAt(parsedInfo.createdAt ? [new Date(parsedInfo.createdAt)] : []);
-            }
-          } else if (ID) {
-            const response = await fetch(`/api/information?id=${ID}`);
-            if (!response.ok) throw new Error("Ошибка загрузки данных");
-            const data = await response.json();
-            if (isMounted) {
-              setInformation(data);
-              setTransactionCreatedAt(data.createdAt ? [new Date(data.createdAt)] : []);
+              if (parsedInfo.createdAt) {
+                localDates[parsedInfo.signerKey] = new Date(parsedInfo.createdAt);
+              }
             }
           }
         } else {
-          if (isMounted) {
-            setTransactionCreatedAt(information.created_at ? [new Date(information.created_at)] : []);
+          if (information.created_at) {
+            localDates[tx.tx.source_account] = new Date(information.created_at);
           }
         }
   
-        // Firebase request to get transaction data
-        const querySnapshot = await getDocs(collection(firestore, "transactions"));
+        if (!isFirestoreActive) {
+          console.warn("⚠️ Firestore отключен, пропускаем запрос.");
+          return;
+        }
+  
+        const querySnapshot = await getDocs(collection(firestore, "TransactionsForSignPublic"));
+  
         if (!isMounted) return;
   
-        const transactionsData: TransactionData[] = querySnapshot.docs.map((doc) => {
+        console.log("🔥 Firestore документов:", querySnapshot.docs.length);
+  
+        querySnapshot.forEach((doc) => {
           const data = doc.data();
-          return {
-            id: doc.id,
-            xdr: data.xdr || "",
-            createdAt: data.createdAt ? (data.createdAt as Timestamp).toMillis() : 0,
-            updatedAt: data.updatedAt ? (data.updatedAt as Timestamp).toMillis() : 0,
-          };
+          const signerKey = data.signerKey || doc.id; 
+          if (typeof data.createdAt === "number" && signerKey) {
+            localDates[signerKey] = new Date(data.createdAt);
+          }
+          console.log("📄 ID:", doc.id, "➡️ Данные:", doc.data());
         });
   
+        console.log("📅 Привязанные даты:", localDates);
+  
         if (isMounted) {
-          setTransactions(transactionsData);
-  
-          // Collect unique dates
-          const allDates = new Set<number>(
-            transactionsData.filter((transaction) => transaction.createdAt).map((transaction) => transaction.createdAt)
-          );
-  
-          if (isMounted) {
-            setTransactionCreatedAt(Array.from(allDates).map((ts) => new Date(ts)));
-          }
+          setTransactionsBySigner(localDates);
         }
-      } catch (error) {
-        console.error("Ошибка при загрузке информации:", error);
+      } catch (error: any) {
+        console.error("❌ Ошибка при загрузке информации:", error);
+        if (error.message.includes("terminated")) {
+          setIsFirestoreActive(false);
+        }
       }
     };
   
     loadInformation();
   
     return () => {
-      isMounted = false; // Cleanup when the component is unmounted
+      isMounted = false;
+      console.log("🛑 useEffect размонтирован");
     };
-  }, [information, setInformation, ID]);
+  }, [information, setInformation, ID, isFirestoreActive]);
+  
   
   
 
@@ -162,27 +168,14 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
             <tr>
               <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Public Key</th>
               <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Weight</th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Created At</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedSigners.sort((a) => (a.key === ID ? -1 : 1)).map((item: Signer) => (
+          
               <tr key={item.key}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <TransactionIcon
-                    memoText={tx.tx.memo.toString()}
-                    selectedMemoType={selectedMemoType}
-                    setSelectedMemoType={setSelectedMemoType}
-                    lowerTime={tx.tx.cond.time.max_time}
-                    upperTime={tx.tx.cond.time.min_time}
-                    baseFee={tx.tx.fee || 100}
-                    isVisible={false}
-                    typeIcon="Change"
-                    typeOp="set_options"
-                    masterWeight={item.weight}
-                    weight={item.weight}
-                    sourceAccount={item.key}
-                    ID={""}
-                  />
                   <Link href={`/${net}/account?id=${item.key}`} legacyBehavior>
                     <a title={item.key} className="account-address word-break">
                       <span>{collapseAccount(item.key)}</span>
@@ -192,23 +185,23 @@ const InputTable: FC<InputGroupProps> = ({ ID }) => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span>(w: <b>{item.weight}</b>)</span>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4 whitespace-nowrap">
+  {transactionsBySigner[item.key.trim()] ? (
+    transactionsBySigner[item.key.trim()].toLocaleString()
+  ) : (
+    <span style={{ color: "red" }}>N/A</span>
+  )}
+</td>
+
+</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className="px-6 py-4 text-gray-700">
-          <h3>Transaction Creation Time:</h3>
-          <ul>
-            {transactionCreatedAt.length > 0 ? (
-              transactionCreatedAt.map((date, index) => <li key={index}>{date.toLocaleString()}</li>)
-            ) : (
-              <span>N/A</span>
-            )}
-          </ul>
-        </div>
       </div>
     </div>
   );
-};
+};  
 
 export default InputTable;

@@ -4,7 +4,7 @@ import {
   FirebaseOptions,
   getApps,
   initializeApp,
-  deleteApp,
+  getApp,
 } from "firebase/app";
 import { Firestore, getFirestore } from "firebase/firestore";
 import { StateCreator } from "zustand";
@@ -14,52 +14,32 @@ export const firebaseSettingsSlice: StateCreator<
   [["zustand/immer", never]],
   [],
   IFirebaseSettingsSlice
-> = (set /*, get*/) => {
-  const firebaseApp: FirebaseApp | undefined = undefined;
-  const firestore: Firestore | undefined = undefined;
-
+> = (set) => {
   const initializeFirebase = (config: FirebaseOptions, appName?: string) => {
     const name = appName || "[DEFAULT]";
     const existingApps = getApps();
 
-    if (existingApps.length) {
-      for (const app of existingApps) {
-        if (app.name === name) {
-          deleteApp(app);
-        }
-      }
-    }
+    let firebaseApp: FirebaseApp;
 
-    if (
-      config.apiKey &&
-      config.appId &&
-      config.messagingSenderId &&
-      config.storageBucket &&
-      config.projectId &&
-      config.authDomain
-    ) {
-      const newFirebaseApp = initializeApp(config, name);
-      set({ firebaseApp: newFirebaseApp });
-
-      if (newFirebaseApp) {
-        const newFirestore = getFirestore(newFirebaseApp);
-        set({ firestore: newFirestore });
-        return newFirebaseApp;
-      }
+    if (existingApps.length > 0) {
+      firebaseApp = getApp(name); // Используем существующий
     } else {
-      console.warn("Firebase config is empty. Firebase is not in use. ");
+      firebaseApp = initializeApp(config, name); // Инициализируем новый
     }
-  };
 
-  
-  const setFirestore = (newFirestore: Firestore | undefined) => {
-    set({ firestore: newFirestore });
+    const firestore = getFirestore(firebaseApp);
+
+    set({ firebaseApp, firestore });
+
+    return firebaseApp;
   };
 
   return {
-    firestore,
-    firebaseApp,
-    setFirestore,
+    firestore: undefined,
+    firebaseApp: undefined,
+    setFirestore: (newFirestore: Firestore | undefined) => {
+      set({ firestore: newFirestore });
+    },
     initializeFirebase,
   };
 };
